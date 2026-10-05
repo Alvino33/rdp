@@ -8,11 +8,32 @@ jobs:
       - name: Enable RDP
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -Value 0
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -Value 1
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -Value 0
           Set-Service TermService -StartupType Automatic
           Start-Service TermService
           New-NetFirewallRule -DisplayName "RDP-3389" -Direction Inbound -Protocol TCP -LocalPort 3389 -Action Allow -Profile Any
           Set-LocalUser -Name runneradmin -Password (ConvertTo-SecureString -AsPlainText "${{ secrets.RDP_PASSWORD }}" -Force)
+
+      - name: Install tools
+        run: choco install -y androidstudio openjdk17 git
+
+      - name: Setup project and autosave
+        run: |
+          git config --global user.email "alvino@example.com"
+          git config --global user.name "Alvino33"
+          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git C:\project
+          $script = @'
+          cd C:\project
+          while ($true) {
+            git add .
+            git commit -m "autosave $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")" -q 2>$null
+            git push -q 2>$null
+            Start-Sleep -Seconds 30
+          }
+          '@
+          Set-Content -Path C:\autosave.ps1 -Value $script
+          Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File C:\autosave.ps1" -WindowStyle Minimized
+
       - name: Connect Tailscale
         uses: tailscale/github-action@v3
         with:
