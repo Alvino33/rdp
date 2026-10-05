@@ -22,9 +22,11 @@ jobs:
           Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "C:\ts.exe"
           Start-Process -FilePath "C:\ts.exe" -ArgumentList "/quiet" -Wait
           Set-Service -Name Tailscale -StartupType Automatic
+          sc.exe config Tailscale depend= "NetMan"
+          sc.exe failure Tailscale reset= 60 actions= restart/5000/restart/10000/restart/30000
           Start-Service Tailscale
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp --unattended
-
+          
       - name: Show IP
         run: |
           Start-Sleep -Seconds 5
