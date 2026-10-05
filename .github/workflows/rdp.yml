@@ -22,10 +22,15 @@ jobs:
           Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "C:\ts.exe"
           Start-Process -FilePath "C:\ts.exe" -ArgumentList "/quiet" -Wait
           Set-Service -Name Tailscale -StartupType Automatic
-          sc.exe config Tailscale depend= "NetMan"
           sc.exe failure Tailscale reset= 60 actions= restart/5000/restart/10000/restart/30000
           Start-Service Tailscale
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp --unattended
+
+          $action = New-ScheduledTaskAction -Execute "C:\Program Files\Tailscale\tailscale.exe" -Argument "up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp --unattended"
+          $trigger = New-ScheduledTaskTrigger -AtStartup
+          $trigger.Delay = "PT30S"
+          $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+          Register-ScheduledTask -TaskName "TailscaleReconnect" -Action $action -Trigger $trigger -Principal $principal -Force
           
       - name: Show IP
         run: |
