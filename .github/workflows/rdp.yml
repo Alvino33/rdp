@@ -15,7 +15,7 @@ jobs:
           Set-LocalUser -Name runneradmin -Password (ConvertTo-SecureString -AsPlainText "${{ secrets.RDP_PASSWORD }}" -Force)
 
       - name: Install tools
-        run: choco install -y androidstudio openjdk17 git
+        run: choco install -y git
 
       - name: Setup project and autosave
         run: |
