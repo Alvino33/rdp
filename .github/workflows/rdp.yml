@@ -30,7 +30,7 @@ jobs:
 
       - name: Setup project and autosave
         run: |
-          git config --global user.email "alvino@example.com"
+          git config --global user.email "alvino@gmail.com"
           git config --global user.name "Alvino33"
           git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git C:\project
           $script = @'
