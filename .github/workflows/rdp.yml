@@ -17,6 +17,17 @@ jobs:
       - name: Install tools
         run: choco install -y git
 
+      - name: Install Tailscale as service
+        run: |
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "C:\ts.exe"
+          Start-Process -FilePath "C:\ts.exe" -ArgumentList "/quiet" -Wait
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp --unattended
+
+      - name: Show IP
+        run: |
+          Start-Sleep -Seconds 5
+          & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+
       - name: Setup project and autosave
         run: |
           git config --global user.email "alvino@example.com"
@@ -33,15 +44,6 @@ jobs:
           '@
           Set-Content -Path C:\autosave.ps1 -Value $script
           Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File C:\autosave.ps1" -WindowStyle Minimized
-
-      - name: Connect Tailscale
-        uses: tailscale/github-action@v3
-        with:
-          authkey: ${{ secrets.TS_AUTHKEY }}
-          hostname: gh-rdp
-
-      - name: Show IP
-        run: tailscale ip -4
 
       - name: Keep alive
         run: Start-Sleep -Seconds 21000
