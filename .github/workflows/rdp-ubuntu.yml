@@ -10,13 +10,14 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           sudo apt update
-          sudo apt install -y ubuntu-desktop xrdp firefox git
+          sudo apt install -y ubuntu-desktop xrdp firefox git dbus-x11
           sudo systemctl enable xrdp
+          sudo adduser xrdp ssl-cert
           sudo useradd -m -s /bin/bash gituser
           echo "gituser:${{ secrets.RDP_PASSWORD }}" | sudo chpasswd
-          echo "gnome-session" | sudo tee /home/gituser/.xsession
+          echo "export \$(dbus-launch)" | sudo tee -a /home/gituser/.xsession
+          echo "gnome-session --session=ubuntu" | sudo tee -a /home/gituser/.xsession
           sudo chown gituser:gituser /home/gituser/.xsession
-          sudo adduser gituser ssl-cert
           sudo service xrdp restart
 
       - name: Install Tailscale as systemd service
@@ -49,6 +50,16 @@ jobs:
           sudo chmod +x /home/gituser/autosave.sh
           sudo chown gituser:gituser /home/gituser/autosave.sh
           sudo -u gituser bash -c "nohup /home/gituser/autosave.sh > /home/gituser/autosave.log 2>&1 &"
+
+      - name: Debug xRDP Log
+        if: always()
+        run: |
+          echo "=== STATUS XRDP ==="
+          sudo systemctl status xrdp --no-pager
+          echo "=== LOG XRDP ==="
+          sudo cat /var/log/xrdp.log
+          echo "=== LOG XRDP SESMAN ==="
+          sudo cat /var/log/xrdp-sesman.log
 
       - name: Keep alive
         run: sleep 21000
