@@ -1,0 +1,50 @@
+name: RDP-Ubuntu-GNOME
+on: workflow_dispatch
+jobs:
+  rdp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Install GNOME Desktop and xRDP
+        run: |
+          sudo apt update
+          sudo apt install -y ubuntu-desktop xrdp firefox git
+          sudo systemctl enable xrdp
+          sudo useradd -m -s /bin/bash gituser
+          echo "gituser:${{ secrets.RDP_PASSWORD }}" | sudo chpasswd
+          echo "gnome-session" | sudo tee /home/gituser/.xsession
+          sudo chown gituser:gituser /home/gituser/.xsession
+          sudo adduser gituser ssl-cert
+          sudo service xrdp restart
+
+      - name: Install Tailscale as systemd service
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo systemctl enable tailscaled
+          sudo systemctl start tailscaled
+          sudo tailscale up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp-ubuntu --unattended
+
+      - name: Show IP
+        run: tailscale ip -4
+
+      - name: Setup project and autosave
+        run: |
+          git config --global user.email "alvino@example.com"
+          git config --global user.name "Alvino33"
+          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/gituser/project
+          sudo chown -R gituser:gituser /home/gituser/project
+          cat << 'EOF' > /home/gituser/autosave.sh
+          #!/bin/bash
+          cd /home/gituser/project
+          while true; do
+            git add .
+            git commit -m "autosave $(date '+%Y-%m-%d %H:%M:%S')" -q
+            git push -q
+            sleep 30
+          done
+          EOF
+          chmod +x /home/gituser/autosave.sh
+          sudo -u gituser nohup /home/gituser/autosave.sh > /home/gituser/autosave.log 2>&1 &
+
+      - name: Keep alive
+        run: sleep 21000
