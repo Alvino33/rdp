@@ -1,5 +1,6 @@
 name: RDP-Ubuntu-GNOME
 on: workflow_dispatch
+
 jobs:
   rdp:
     runs-on: ubuntu-latest
@@ -7,6 +8,7 @@ jobs:
     steps:
       - name: Install GNOME Desktop and xRDP
         run: |
+          export DEBIAN_FRONTEND=noninteractive
           sudo apt update
           sudo apt install -y ubuntu-desktop xrdp firefox git
           sudo systemctl enable xrdp
@@ -17,12 +19,11 @@ jobs:
           sudo adduser gituser ssl-cert
           sudo service xrdp restart
 
-      - name: Install Tailscale as systemd service
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo systemctl enable tailscaled
-          sudo systemctl start tailscaled
-          sudo tailscale up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp-ubuntu --unattended
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          args: --hostname=gh-rdp-ubuntu --unattended
 
       - name: Show IP
         run: tailscale ip -4
@@ -44,7 +45,7 @@ jobs:
           done
           EOF
           chmod +x /home/gituser/autosave.sh
-          sudo -u gituser nohup /home/gituser/autosave.sh > /home/gituser/autosave.log 2>&1 &
+          sudo -u gituser bash -c "nohup /home/gituser/autosave.sh > /home/gituser/autosave.log 2>&1 &"
 
       - name: Keep alive
         run: sleep 21000
