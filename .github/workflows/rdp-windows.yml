@@ -1,0 +1,62 @@
+name: RDP-Windows
+on: workflow_dispatch
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    steps:
+      - name: Enable RDP and Create User
+        shell: powershell
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Restart-Service TermService -Force
+          
+          $password = ConvertTo-SecureString "${{ secrets.RDP_PASSWORD }}" -AsPlainText -Force
+          if (Get-LocalUser -Name "rdpuser" -ErrorAction SilentlyContinue) {
+            Remove-LocalUser -Name "rdpuser"
+          }
+          New-LocalUser -Name "rdpuser" -Password $password -PasswordNeverExpires -AccountNeverExpires -FullName "RDP User"
+          Add-LocalGroupMember -Group "Administrators" -Member "rdpuser"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "rdpuser"
+          Write-Host "RDP Enabled. User: rdpuser"
+
+      - name: Install Tailscale (Unattended Mode)
+        shell: powershell
+        run: |
+          $url = "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe"
+          $out = "$env:TEMP\tailscale-setup.exe"
+          Invoke-WebRequest -Uri $url -OutFile $out
+          Start-Process -FilePath $out -ArgumentList "/quiet TS_UNATTENDEDMODE=1" -Wait
+          Start-Sleep -Seconds 20
+          
+          $ts = "C:\Program Files\Tailscale\tailscale.exe"
+          & $ts up --auth-key=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp-windows --unattended
+          Start-Sleep -Seconds 5
+          & $ts status
+          Write-Host "Tailscale IP:"
+          & $ts ip -4
+
+      - name: Setup Project and Autosave
+        shell: powershell
+        run: |
+          git config --global user.email "alvino@example.com"
+          git config --global user.name "Alvino33"
+          
+          $repoUrl = "https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git"
+          $projectPath = "C:\Users\Public\project"
+          if (Test-Path $projectPath) { Remove-Item $projectPath -Recurse -Force }
+          git clone $repoUrl $projectPath
+          
+          $autosaveScript = 'cd "' + $projectPath + '"; while ($true) { git add .; git commit -m "autosave $(Get-Date -Format ''yyyy-MM-dd HH:mm:ss'')" 2>$null; git push 2>$null; Start-Sleep -Seconds 30 }'
+          $autosaveScript | Out-File -FilePath "C:\autosave.ps1" -Encoding UTF8
+          
+          Start-Process powershell -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -File C:\autosave.ps1" -WindowStyle Hidden
+          Write-Host "Autosave started"
+
+      - name: Keep Alive
+        shell: powershell
+        run: Start-Sleep -Seconds 21000
