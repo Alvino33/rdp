@@ -14,24 +14,17 @@ jobs:
           New-NetFirewallRule -DisplayName "RDP-3389" -Direction Inbound -Protocol TCP -LocalPort 3389 -Action Allow -Profile Any
           Set-LocalUser -Name runneradmin -Password (ConvertTo-SecureString -AsPlainText "${{ secrets.RDP_PASSWORD }}" -Force)
 
-      - name: Install tools
-        run: choco install -y git
-
       - name: Install Tailscale as service
         run: |
           Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "C:\ts.exe"
           Start-Process -FilePath "C:\ts.exe" -ArgumentList "/quiet" -Wait
+          New-Item -Path "HKLM:\SOFTWARE\Tailscale IPN" -Force | Out-Null
+          New-ItemProperty -Path "HKLM:\SOFTWARE\Tailscale IPN" -Name "UnattendedMode" -Value "always" -PropertyType String -Force
+          New-ItemProperty -Path "HKLM:\SOFTWARE\Tailscale IPN" -Name "LoginURL" -Value "https://login.tailscale.com" -PropertyType String -Force
           Set-Service -Name Tailscale -StartupType Automatic
-          sc.exe failure Tailscale reset= 60 actions= restart/5000/restart/10000/restart/30000
           Start-Service Tailscale
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp --unattended
 
-          $action = New-ScheduledTaskAction -Execute "C:\Program Files\Tailscale\tailscale.exe" -Argument "up --authkey=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp --unattended"
-          $trigger = New-ScheduledTaskTrigger -AtStartup
-          $trigger.Delay = "PT30S"
-          $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-          Register-ScheduledTask -TaskName "TailscaleReconnect" -Action $action -Trigger $trigger -Principal $principal -Force
-          
       - name: Show IP
         run: |
           Start-Sleep -Seconds 5
@@ -39,7 +32,7 @@ jobs:
 
       - name: Setup project and autosave
         run: |
-          git config --global user.email "alvino@gmail.com"
+          git config --global user.email "alvinosetyawan5@gmail.com"
           git config --global user.name "Alvino33"
           git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git C:\project
           $script = @'
