@@ -1,0 +1,28 @@
+name: Test Git Autosave
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup user and test git
+        run: |
+          sudo useradd -m -s /bin/bash gituser
+          echo "gituser:${{ secrets.RDP_PASSWORD }}" | sudo chpasswd
+          sudo -u gituser git config --global user.email "alvino@example.com"
+          sudo -u gituser git config --global user.name "Alvino33"
+          sudo -u gituser git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/gituser/project
+          sudo tee /home/gituser/autosave.sh << 'EOF' > /dev/null
+          #!/bin/bash
+          cd /home/gituser/project
+          while true; do
+            git add .
+            git commit -m "autosave $(date '+%Y-%m-%d %H:%M:%S')" -q
+            git push -q
+            sleep 30
+          done
+          EOF
+          sudo chmod +x /home/gituser/autosave.sh
+          sudo chown gituser:gituser /home/gituser/autosave.sh
+          sudo -u gituser bash -c "nohup /home/gituser/autosave.sh > /home/gituser/autosave.log 2>&1 &"
+          echo "TES BERHASIL! Izin git sudah aman."
