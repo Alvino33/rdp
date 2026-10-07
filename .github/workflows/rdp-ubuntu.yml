@@ -19,11 +19,14 @@ jobs:
           sudo adduser gituser ssl-cert
           sudo service xrdp restart
 
-      - name: Setup Tailscale
-        uses: tailscale/github-action@v2
-        with:
-          authkey: ${{ secrets.TS_AUTHKEY }}
-          args: --hostname=gh-rdp-ubuntu --unattended
+      - name: Install Tailscale as systemd service
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo systemctl enable tailscaled
+          sudo systemctl start tailscaled
+          sleep 5
+          sudo tailscale up --auth-key=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp-ubuntu
+          sudo tailscale status
 
       - name: Show IP
         run: tailscale ip -4
