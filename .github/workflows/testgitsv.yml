@@ -9,9 +9,7 @@ jobs:
         run: |
           sudo useradd -m -s /bin/bash gituser
           echo "gituser:${{ secrets.RDP_PASSWORD }}" | sudo chpasswd
-          sudo -u gituser git config --global user.email "alvino@example.com"
-          sudo -u gituser git config --global user.name "Alvino33"
-          sudo -u gituser git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/gituser/project
+          sudo -u gituser bash -c "cd /home/gituser && git config --global user.email 'alvino@example.com' && git config --global user.name 'Alvino33' && git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/gituser/project"
           sudo tee /home/gituser/autosave.sh << 'EOF' > /dev/null
           #!/bin/bash
           cd /home/gituser/project
