@@ -1,0 +1,66 @@
+name: RDP-Ubuntu-Cinnamon
+on: workflow_dispatch
+
+jobs:
+  rdp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Install Cinnamon and xRDP
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt update
+          sudo apt install -y cinnamon cinnamon-core nemo gnome-terminal xorgxrdp xrdp firefox git dbus-x11 arc-theme papirus-icon-theme
+          sudo systemctl enable xrdp
+          sudo adduser xrdp ssl-cert
+          sudo useradd -m -s /bin/bash gituser
+          echo "gituser:${{ secrets.RDP_PASSWORD }}" | sudo chpasswd
+          echo "export \$(dbus-launch)" | sudo tee -a /home/gituser/.xsession
+          echo "cinnamon-session" | sudo tee -a /home/gituser/.xsession
+          sudo chown gituser:gituser /home/gituser/.xsession
+          sudo sed -i 's/^new_cursors=true/new_cursors=false/g' /etc/xrdp/xrdp.ini
+          sudo cp /etc/xrdp/startwm.sh /etc/xrdp/startwm.sh.bak
+          sudo bash -c 'cat << "EOF" > /etc/xrdp/startwm.sh
+          #!/bin/sh
+          if [ -r /etc/default/locale ]; then
+            . /etc/default/locale
+            export LANG LANGUAGE
+          fi
+          cinnamon-session
+          EOF'
+          sudo chmod +x /etc/xrdp/startwm.sh
+          sudo service xrdp restart
+
+      - name: Install Tailscale as systemd service
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo systemctl enable tailscaled
+          sudo systemctl start tailscaled
+          sleep 5
+          sudo tailscale up --auth-key=${{ secrets.TS_AUTHKEY }} --hostname=gh-rdp-ubuntu
+          sudo tailscale status
+
+      - name: Show IP
+        run: tailscale ip -4
+
+      - name: Setup project and autosave
+        run: |
+          sudo -u gituser bash -c "cd /home/gituser && git config --global user.email 'alvino@example.com' && git config --global user.name 'Alvino33' && git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/gituser/project"
+
+          sudo tee /home/gituser/autosave.sh << 'EOF' > /dev/null
+          #!/bin/bash
+          cd /home/gituser/project
+          while true; do
+            git add .
+            git commit -m "autosave $(date '+%Y-%m-%d %H:%M:%S')" -q
+            git push -q
+            sleep 30
+          done
+          EOF
+
+          sudo chmod +x /home/gituser/autosave.sh
+          sudo chown gituser:gituser /home/gituser/autosave.sh
+          sudo -u gituser bash -c "nohup /home/gituser/autosave.sh > /home/gituser/autosave.log 2>&1 &"
+
+      - name: Keep alive
+        run: sleep 21000
