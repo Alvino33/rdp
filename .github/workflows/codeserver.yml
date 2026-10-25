@@ -1,0 +1,51 @@
+name: CodeServer
+on: workflow_dispatch
+jobs:
+  codeserver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Install code-server
+        run: curl -fsSL https://code-server.dev/install.sh | sh
+
+      - name: Setup project
+        run: |
+          git config --global user.email "alvino@example.com"
+          git config --global user.name "Alvino33"
+          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/vscode-data.git /home/runner/project
+
+      - name: Start autosave
+        run: |
+          cat << 'EOF' > /home/runner/autosave.sh
+          #!/bin/bash
+          cd /home/runner/project
+          while true; do
+            git add .
+            git commit -m "autosave $(date '+%Y-%m-%d %H:%M:%S')" -q
+            git push -q
+            sleep 30
+          done
+          EOF
+          chmod +x /home/runner/autosave.sh
+          nohup /home/runner/autosave.sh > /home/runner/autosave.log 2>&1 &
+
+      - name: Start code-server
+        env:
+          PASSWORD: ${{ secrets.CODE_PASSWORD }}
+        run: |
+          code-server --bind-addr 0.0.0.0:8080 /home/runner/project > /home/runner/codeserver.log 2>&1 &
+          sleep 5
+
+      - name: Start Cloudflare Tunnel
+        run: |
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+          ./cloudflared tunnel --url http://localhost:8080 > tunnel.log 2>&1 &
+          sleep 10
+          echo "=========================================="
+          echo "LINK AKSES CODE-SERVER:"
+          grep -o 'https://[a-zA-Z0-9.-]*trycloudflare.com' tunnel.log
+          echo "=========================================="
+
+      - name: Keep alive
+        run: sleep 21000
