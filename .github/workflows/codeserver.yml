@@ -8,13 +8,25 @@ jobs:
       - name: Install code-server
         run: curl -fsSL https://code-server.dev/install.sh | sh
 
+      - name: Restore code-server config (extensions, theme, settings)
+        run: |
+          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/codeserver-config.git /tmp/config-backup || true
+          mkdir -p ~/.local/share/code-server
+          mkdir -p ~/.config/code-server
+          if [ -d /tmp/config-backup/extensions ]; then
+            cp -r /tmp/config-backup/extensions ~/.local/share/code-server/
+          fi
+          if [ -d /tmp/config-backup/User ]; then
+            cp -r /tmp/config-backup/User ~/.local/share/code-server/
+          fi
+
       - name: Setup project
         run: |
           git config --global user.email "alvino@example.com"
           git config --global user.name "Alvino33"
-          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/vscode-data.git /home/runner/project
+          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/runner/project
 
-      - name: Start autosave
+      - name: Start autosave (project)
         run: |
           cat << 'EOF' > /home/runner/autosave.sh
           #!/bin/bash
@@ -28,6 +40,27 @@ jobs:
           EOF
           chmod +x /home/runner/autosave.sh
           nohup /home/runner/autosave.sh > /home/runner/autosave.log 2>&1 &
+
+      - name: Start autosave (code-server config)
+        run: |
+          cat << 'EOF' > /home/runner/autosave-config.sh
+          #!/bin/bash
+          mkdir -p /tmp/config-backup
+          cd /tmp/config-backup
+          git init -q 2>/dev/null
+          git remote add origin https://${{ secrets.GH_PAT }}@github.com/Alvino33/codeserver-config.git 2>/dev/null
+          while true; do
+            rsync -a --delete ~/.local/share/code-server/extensions/ /tmp/config-backup/extensions/ 2>/dev/null
+            rsync -a --delete ~/.local/share/code-server/User/ /tmp/config-backup/User/ 2>/dev/null
+            cd /tmp/config-backup
+            git add .
+            git commit -m "config autosave $(date '+%Y-%m-%d %H:%M:%S')" -q
+            git push -q origin main 2>/dev/null
+            sleep 60
+          done
+          EOF
+          chmod +x /home/runner/autosave-config.sh
+          nohup /home/runner/autosave-config.sh > /home/runner/autosave-config.log 2>&1 &
 
       - name: Start code-server
         env:
