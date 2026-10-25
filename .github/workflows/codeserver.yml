@@ -24,7 +24,7 @@ jobs:
         run: |
           git config --global user.email "alvino@example.com"
           git config --global user.name "Alvino33"
-          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/project-apk.git /home/runner/project
+          git clone https://${{ secrets.GH_PAT }}@github.com/Alvino33/vscode-data.git /home/runner/project
 
       - name: Start autosave (project)
         run: |
